@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Rayon déplaçable et plan focal variable</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      background: #f0f0f0;
+      margin: 20px;
+    }
+    canvas {
+      background: #fff;
+      border: 1px solid #ccc;
+    }
+  </style>
+</head>
+<body>
+  <h1>Rayon déplaçable et plan focal variable</h1>
+  <canvas id="canvas" width="800" height="400"></canvas>
+  <p>Faites glisser le point bleu pour déplacer la hauteur d'incidence du rayon entrant dans la lentille.</p>
+  
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+
+    // Configuration de la scène
+    const centerY = canvas.height / 2;  // Axe optique horizontal (ligne centrale)
+    const lensX = 400;                  // Position horizontale de la lentille
+    const lensWidth = 40;               // Largeur de la lentille
+    const lensHeight = 250;             // Hauteur de la lentille (plus grande que précédemment)
+    const f = 150;                      // Focale nominale (distance de la lentille au point focal pour un rayon centré)
+    const k = 0.4;                      // Facteur simulant le décalage du plan focal selon la déviation verticale du rayon
+    // Position initiale du rayon (son point d'incidence sur la lentille)
+    let rayY = centerY + 80;            
+
+    // Paramètres du "handle" (poignée) qui permet de déplacer le rayon
+    const handleX = 50;                 // Position horizontale fixe pour le point draggable
+    const handleRadius = 8;
+
+    let dragging = false;  // Indique si l'utilisateur est en train de déplacer la poignée
+
+    // Dessiner la lentille sous forme d'ellipse
+    function drawLens() {
+      ctx.save();
+      ctx.fillStyle = 'rgba(100,150,255,0.3)';
+      ctx.beginPath();
+      // L'ellipse est centrée en (lensX, centerY)
+      ctx.ellipse(lensX, centerY, lensWidth / 2, lensHeight / 2, 0, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // Dessiner l'axe optique (ligne horizontale en pointillé)
+    function drawOpticalAxis() {
+      ctx.save();
+      ctx.strokeStyle = '#aaa';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([5, 5]);
+      ctx.beginPath();
+      ctx.moveTo(0, centerY);
+      ctx.lineTo(canvas.width, centerY);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Dessiner le rayon et son extension après la lentille
+    function drawRay() {
+      // 1. Rayon entrant (de la gauche jusqu'à la lentille)
+      ctx.save();
+      ctx.strokeStyle = 'blue';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, rayY);
+      ctx.lineTo(lensX, rayY);
+      ctx.stroke();
+      ctx.restore();
+
+      // 2. Calcul du point focal pour ce rayon :
+      // On définit delta comme la déviation verticale par rapport à l'axe optique
+      const delta = rayY - centerY;
+      // Le point de convergence (focal) est décalé horizontalement par rapport à la focale nominale :
+      const focusX = lensX + f + k * delta;
+      // Le point focal est toujours sur l'axe optique (y = centerY)
+
+      // 3. Rayon réfracté (de la lentille au point focal)
+      ctx.save();
+      ctx.strokeStyle = 'blue';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(lensX, rayY);
+      ctx.lineTo(focusX, centerY);
+      ctx.stroke();
+      ctx.restore();
+
+      // 4. Prolonger le rayon au-delà du point focal (en pointillé)
+      // Pour cela, on prolonge la droite passant par (lensX, rayY) et (focusX, centerY)
+      const slope = (centerY - rayY) / (focusX - lensX);
+      const xExt = canvas.width;
+      const yExt = centerY + slope * (xExt - focusX);
+      ctx.save();
+      ctx.strokeStyle = 'blue';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 5]);
+      ctx.beginPath();
+      ctx.moveTo(focusX, centerY);
+      ctx.lineTo(xExt, yExt);
+      ctx.stroke();
+      ctx.restore();
+
+      // 5. Dessiner une ligne verticale (en rouge) représentant le plan focal pour ce rayon
+      ctx.save();
+      ctx.strokeStyle = 'red';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([5, 5]);
+      ctx.beginPath();
+      ctx.moveTo(focusX, 0);
+      ctx.lineTo(focusX, canvas.height);
+      ctx.stroke();
+      // Ajouter une étiquette pour le plan focal
+      ctx.fillStyle = 'red';
+      ctx.font = "14px sans-serif";
+      ctx.fillText("Plan focal", focusX + 5, 20);
+      ctx.restore();
+    }
+
+    // Dessiner la poignée sur le rayon entrant (pour faciliter son déplacement)
+    function drawHandle() {
+      ctx.save();
+      ctx.fillStyle = 'blue';
+      ctx.beginPath();
+      ctx.arc(handleX, rayY, handleRadius, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // Fonction principale de dessin
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawOpticalAxis();
+      drawLens();
+      drawRay();
+      drawHandle();
+    }
+
+    draw();
+
+    // --- Gestion des événements de souris pour le déplacement de la poignée ---
+    // Récupérer la position de la souris par rapport au canvas
+    function getMousePos(evt) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: evt.clientX - rect.left,
+        y: evt.clientY - rect.top
+      };
+    }
+
+    canvas.addEventListener('mousedown', function(evt) {
+      const pos = getMousePos(evt);
+      // Vérifier si le clic est proche de la poignée
+      const dx = pos.x - handleX;
+      const dy = pos.y - rayY;
+      if (Math.sqrt(dx * dx + dy * dy) < handleRadius + 5) {
+        dragging = true;
+      }
+    });
+
+    canvas.addEventListener('mousemove', function(evt) {
+      if (dragging) {
+        const pos = getMousePos(evt);
+        // Mettre à jour rayY en fonction de la position verticale de la souris
+        rayY = Math.max(0, Math.min(canvas.height, pos.y));
+        draw();
+      }
+    });
+
+    canvas.addEventListener('mouseup', function() {
+      dragging = false;
+    });
+    canvas.addEventListener('mouseleave', function() {
+      dragging = false;
+    });
+  </script>
+</body>
+</html>
